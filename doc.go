@@ -36,6 +36,37 @@
 //
 // The list is requested each time the menu opens, so it is never stale.
 //
+// # History
+//
+// Every navigation is recorded the way a browser does it. [Nav.Back] returns
+// to the stack before the last navigation — after a jump to the root it
+// brings the dropped layers back with their views as they were — and
+// [Nav.Forward] undoes that. [Nav.SetHistoryButtons] puts back and forward
+// buttons in front of the steps, [Nav.BindShortcuts] binds Alt+Left,
+// Alt+Right and Alt+Up (one layer up).
+//
+// # Stale layers
+//
+// A covered layer may go stale, for example when the user switches areas
+// further up. [WithOnReturn] calls a function whenever its layer becomes the
+// top layer again, and [Nav.OnChanged] reports every navigation.
+//
+// # Saving the stack
+//
+// Views cannot be saved, but what they show can be named. Layers pushed with
+// [WithKey] make up the [Nav.Route], a plain string slice for preferences or
+// JSON; [Nav.Restore] hands each key back to the application to push the
+// layer again after a restart:
+//
+//	nav.OnChanged = func() { prefs.SetStringList("route", nav.Route()) }
+//	nav.Restore(prefs.StringList("route"), openByKey)
+//
+// # Long titles
+//
+// A title wider than [DefaultMaxTitleWidth] is shortened in the middle, so
+// that start and end — usually a name and a number — stay readable; see
+// [Nav.SetMaxTitleWidth].
+//
 // # Threading
 //
 // Nav is a Fyne widget. Like every widget it must only be used from the Fyne

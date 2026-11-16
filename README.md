@@ -5,7 +5,9 @@
 
 Layered navigation for [Fyne](https://fyne.io) applications: views kept as a
 stack, with a breadcrumb bar on top — and, like the address bar of Windows
-Explorer, a chevron after a step that lists its siblings.
+Explorer, a chevron after a step that lists its siblings. With browser-like
+back and forward, keyboard shortcuts, hooks for stale layers and a saveable
+route.
 
 ```
 Plant ›  Hall 2 ›  Press A
@@ -46,6 +48,9 @@ a dialog: modal dialogs opened from a layer are not steps.
 | `Depth()`, `Titles()` | number of layers, steps from root to top |
 | `Root()`, `Top()`, `Layer(i)` | layer handles |
 | `Layer.SetTitle(t)` | renames a step, e.g. once a heading arrived from a server |
+| `Back()` / `Forward()` | browser-like history, see below |
+| `Route()` / `Restore(route, open)` | save and rebuild the stack |
+| `OnChanged` | called after every navigation |
 
 ## Siblings
 
@@ -84,6 +89,63 @@ A list function that takes a while returns what it knows (or a disabled
 placeholder), starts the fetch and hands the result to `SetChildren`.
 `Layer.RefreshChildren` asks the list function again when the data behind it
 has changed.
+
+## History and keyboard
+
+Every navigation is recorded as in a browser. `Back` returns to the stack
+before the last navigation — after a jump to the root it brings the dropped
+layers back, with their views as they were — and `Forward` undoes that. A new
+navigation after `Back` drops the forward states. Picking a sibling from a
+menu counts as one navigation. The history keeps 50 states by default
+(`SetHistoryLimit`).
+
+```go
+nav.SetHistoryButtons(true)    // ← → in front of the steps
+nav.BindShortcuts(win.Canvas()) // Alt+Left, Alt+Right, Alt+Up (one layer up)
+```
+
+Steps and chevrons are ordinary buttons: Tab reaches them, Space activates
+them, and an open menu takes the arrow keys, Enter and Escape. Fyne gives a
+focused text entry the first say on shortcuts, so the Alt shortcuts work while
+nothing or a button has the focus; bind `Back`, `Forward` and `Pop` to main
+menu items to have them while typing.
+
+## Stale layers
+
+A covered layer may go stale, for example after the user switched areas
+further up. `WithOnReturn` runs whenever its layer becomes the top layer again
+— not on the first push, and not for a layer only passed through on the way to
+a picked sibling:
+
+```go
+nav.Push("Orders", list, breadcrumb.WithOnReturn(list.Reload))
+```
+
+## Saving the stack
+
+Views cannot be saved, but what they show can be named. Layers pushed with
+`WithKey` make up the `Route`, a plain `[]string`; `Restore` hands each key
+back to the application, which pushes the layer again. It stops at the first
+key that no longer opens and starts a fresh history.
+
+```go
+nav.OnChanged = func() { prefs.SetStringList("route", nav.Route()) }
+
+nav.Restore(prefs.StringList("route"), func(key string) bool {
+	order, ok := lookup(key)
+	if ok {
+		nav.Push(order.Title, orderView(order), breadcrumb.WithKey(key))
+	}
+	return ok
+})
+```
+
+## Long titles
+
+A title wider than 240 units is shortened in the middle —
+`Order 66340 – Cus…ss Line B` — so its start and end stay readable; the full
+title stays in `Layer.Title` and in sibling menus. `SetMaxTitleWidth` changes
+the limit, 0 turns it off. Steps that do not fit in one row wrap onto the next.
 
 ## Threading
 

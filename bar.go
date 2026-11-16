@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
@@ -18,6 +19,10 @@ type bar struct {
 
 	nav   *Nav
 	steps []step
+
+	// lead holds the back and forward buttons, or is nil.
+	lead          *fyne.Container
+	back, forward *widget.Button
 }
 
 // step is one layer in the bar: its crumb and the separator after it. A step
@@ -35,26 +40,42 @@ func newBar(n *Nav) *bar {
 	return b
 }
 
-// rebuild recreates the steps from the navigation stack.
+// rebuild recreates the bar from the navigation state.
 func (b *bar) rebuild() {
-	stack := b.nav.stack
-	last := len(stack) - 1
-	b.steps = make([]step, len(stack))
-	for i, l := range stack {
-		s := step{crumb: widget.NewButton(l.title, nil)}
+	n := b.nav
+	b.lead, b.back, b.forward = nil, nil, nil
+	if n.historyButtons {
+		b.back = widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() { n.Back() })
+		b.forward = widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() { n.Forward() })
+		for _, btn := range []*widget.Button{b.back, b.forward} {
+			btn.Importance = widget.LowImportance
+		}
+		if !n.CanBack() {
+			b.back.Disable()
+		}
+		if !n.CanForward() {
+			b.forward.Disable()
+		}
+		b.lead = container.NewHBox(b.back, b.forward)
+	}
+
+	last := len(n.stack) - 1
+	b.steps = make([]step, len(n.stack))
+	for i, l := range n.stack {
+		s := step{crumb: widget.NewButton(shorten(l.title, n.maxTitleWidth), nil)}
 		if i == last {
 			s.crumb.Importance = widget.HighImportance
 		} else {
 			idx := i
 			s.crumb.Importance = widget.LowImportance
-			s.crumb.OnTapped = func() { b.nav.PopTo(idx) }
+			s.crumb.OnTapped = func() { n.PopTo(idx) }
 		}
 		switch {
 		case l.chevron:
 			idx := i
 			chevron := widget.NewButton(separator, nil)
 			chevron.Importance = widget.LowImportance
-			chevron.OnTapped = func() { b.nav.showChildren(idx, chevron) }
+			chevron.OnTapped = func() { n.showChildren(idx, chevron) }
 			s.sep = chevron
 		case i < last:
 			s.sep = widget.NewLabel(separator)
@@ -80,6 +101,9 @@ func (r *barRenderer) Objects() []fyne.CanvasObject { return r.objects }
 
 func (r *barRenderer) Refresh() {
 	r.objects = r.objects[:0]
+	if r.bar.lead != nil {
+		r.objects = append(r.objects, r.bar.lead)
+	}
 	for _, s := range r.bar.steps {
 		r.objects = append(r.objects, s.crumb)
 		if s.sep != nil {
@@ -103,7 +127,7 @@ func (r *barRenderer) Layout(size fyne.Size) {
 func (r *barRenderer) MinSize() fyne.Size {
 	b := r.bar
 	width := b.Size().Width
-	widest := b.widestStep()
+	widest := b.widestUnit()
 	if width <= 0 {
 		width = math.MaxFloat32
 	} else if width < widest {
@@ -112,49 +136,65 @@ func (r *barRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(widest, b.arrange(width, false))
 }
 
-func (b *bar) widestStep() float32 {
+// unit is what arrange flows: the history buttons or one step.
+type unit struct {
+	a, b fyne.CanvasObject // b may be nil
+}
+
+func (b *bar) units() []unit {
+	units := make([]unit, 0, len(b.steps)+1)
+	if b.lead != nil {
+		units = append(units, unit{a: b.lead})
+	}
+	for _, s := range b.steps {
+		units = append(units, unit{a: s.crumb, b: s.sep})
+	}
+	return units
+}
+
+func (b *bar) widestUnit() float32 {
 	pad := theme.Padding()
 	var w float32
-	for _, s := range b.steps {
-		w = max(w, s.width(pad))
+	for _, u := range b.units() {
+		w = max(w, u.width(pad))
 	}
 	return w
 }
 
-func (s step) width(pad float32) float32 {
-	w := s.crumb.MinSize().Width
-	if s.sep != nil {
-		w += pad + s.sep.MinSize().Width
+func (u unit) width(pad float32) float32 {
+	w := u.a.MinSize().Width
+	if u.b != nil {
+		w += pad + u.b.MinSize().Width
 	}
 	return w
 }
 
-func (s step) height() float32 {
-	h := s.crumb.MinSize().Height
-	if s.sep != nil {
-		h = max(h, s.sep.MinSize().Height)
+func (u unit) height() float32 {
+	h := u.a.MinSize().Height
+	if u.b != nil {
+		h = max(h, u.b.MinSize().Height)
 	}
 	return h
 }
 
-// arrange flows the steps into rows of the given width and returns the
+// arrange flows the units into rows of the given width and returns the
 // height they take. With place set it also moves and sizes the objects.
 func (b *bar) arrange(width float32, place bool) float32 {
 	pad := theme.Padding()
 	var x, y, rowH float32
-	for _, s := range b.steps {
-		w, h := s.width(pad), s.height()
+	for _, u := range b.units() {
+		w, h := u.width(pad), u.height()
 		if x > 0 && x+w > width {
 			x, y, rowH = 0, y+rowH+pad, 0
 		}
 		if place {
-			cs := s.crumb.MinSize()
-			s.crumb.Move(fyne.NewPos(x, y+(h-cs.Height)/2))
-			s.crumb.Resize(cs)
-			if s.sep != nil {
-				ss := s.sep.MinSize()
-				s.sep.Move(fyne.NewPos(x+cs.Width+pad, y+(h-ss.Height)/2))
-				s.sep.Resize(ss)
+			as := u.a.MinSize()
+			u.a.Move(fyne.NewPos(x, y+(h-as.Height)/2))
+			u.a.Resize(as)
+			if u.b != nil {
+				bs := u.b.MinSize()
+				u.b.Move(fyne.NewPos(x+as.Width+pad, y+(h-bs.Height)/2))
+				u.b.Resize(bs)
 			}
 		}
 		x += w + pad

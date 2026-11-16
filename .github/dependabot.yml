@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # go.mod names the oldest Fyne we support, not the newest; the
+    # "latest Fyne" CI job already builds against every new release.
+    ignore:
+      - dependency-name: fyne.io/fyne/v2
 
   - package-ecosystem: github-actions
     directory: /

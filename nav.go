@@ -8,17 +8,35 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+// DefaultMaxTitleWidth is the width beyond which a step's title is shortened
+// in the middle, see [Nav.SetMaxTitleWidth].
+const DefaultMaxTitleWidth float32 = 240
+
 // Nav is the layer controller: a stack of views with a breadcrumb bar on top.
 // Only the topmost layer is shown; the layers below keep their view objects
-// until they are dropped from the stack.
+// until they are dropped from the stack and from the history.
 type Nav struct {
 	widget.BaseWidget
+
+	// OnChanged is called after every navigation — Push, Pop, PopTo, a
+	// breadcrumb or menu tap, Back, Forward, Restore — once the new top
+	// layer is shown. A pick from a sibling menu counts as one navigation.
+	// It suits saving the [Nav.Route] or updating a window title.
+	OnChanged func()
 
 	bar     *bar
 	host    *fyne.Container
 	content fyne.CanvasObject
 	stack   []*Layer
 	menu    *openMenu
+
+	history *history
+	quiet   int  // > 0 while a batch runs
+	dirty   bool // the stack changed during the batch
+	shown   *Layer
+
+	maxTitleWidth  float32
+	historyButtons bool
 }
 
 // openMenu is the chevron menu currently on screen.
@@ -32,12 +50,13 @@ type openMenu struct {
 // New starts a navigation with root as its only layer. rootTitle is the
 // first step in the breadcrumb bar.
 func New(rootTitle string, root fyne.CanvasObject, opts ...LayerOption) *Nav {
-	n := &Nav{host: container.NewStack()}
+	n := &Nav{host: container.NewStack(), maxTitleWidth: DefaultMaxTitleWidth}
 	n.bar = newBar(n)
 	n.content = container.NewBorder(n.bar, nil, nil, nil, n.host)
 	n.ExtendBaseWidget(n)
 	n.stack = []*Layer{n.newLayer(rootTitle, root, opts)}
-	n.update()
+	n.history = newHistory(n.stack)
+	n.commit(false)
 	return n
 }
 
@@ -51,7 +70,7 @@ func (n *Nav) CreateRenderer() fyne.WidgetRenderer {
 func (n *Nav) Push(title string, view fyne.CanvasObject, opts ...LayerOption) *Layer {
 	l := n.newLayer(title, view, opts)
 	n.stack = append(n.stack, l)
-	n.update()
+	n.changed()
 	return l
 }
 
@@ -71,9 +90,9 @@ func (n *Nav) PopTo(i int) {
 	if i < 0 || i >= len(n.stack) || i == len(n.stack)-1 {
 		return
 	}
-	clear(n.stack[i+1:]) // let the dropped views be collected
+	clear(n.stack[i+1:]) // the history keeps what it still needs
 	n.stack = n.stack[:i+1]
-	n.update()
+	n.changed()
 }
 
 // Depth is the number of layers; 1 means only the root.
@@ -100,6 +119,64 @@ func (n *Nav) Titles() []string {
 		titles[i] = l.title
 	}
 	return titles
+}
+
+// SetMaxTitleWidth sets the width beyond which a step's title is shortened in
+// the middle ("Order 6634…ant B"), keeping its start and end readable. The
+// full title stays available through [Layer.Title] and in sibling menus. 0
+// turns shortening off; the default is [DefaultMaxTitleWidth].
+func (n *Nav) SetMaxTitleWidth(w float32) {
+	n.maxTitleWidth = max(w, 0)
+	n.bar.rebuild()
+}
+
+// SetHistoryButtons shows or hides back and forward buttons at the start of
+// the breadcrumb bar. They are hidden by default.
+func (n *Nav) SetHistoryButtons(show bool) {
+	n.historyButtons = show
+	n.bar.rebuild()
+}
+
+// changed is called by every mutation of the stack.
+func (n *Nav) changed() {
+	if n.quiet > 0 {
+		n.dirty = true
+		return
+	}
+	n.commit(true)
+}
+
+// batch runs fn as one navigation: whatever fn does to the stack is shown,
+// recorded and reported once, at the end.
+func (n *Nav) batch(fn func()) {
+	n.quiet++
+	defer func() {
+		n.quiet--
+		if n.quiet == 0 && n.dirty {
+			n.dirty = false
+			n.commit(true)
+		}
+	}()
+	fn()
+}
+
+// commit shows the current stack and runs what follows a navigation.
+func (n *Nav) commit(record bool) {
+	if record {
+		n.history.record(n.stack)
+	}
+	n.update()
+	if top := n.Top(); top != n.shown {
+		n.shown = top
+		returned := top.seen
+		top.seen = true
+		if returned && top.onReturn != nil {
+			top.onReturn()
+		}
+	}
+	if n.OnChanged != nil {
+		n.OnChanged()
+	}
 }
 
 func (n *Nav) update() {
@@ -142,10 +219,12 @@ func (n *Nav) openEntry(l *Layer, e Entry) {
 	if i < 0 {
 		return
 	}
-	n.PopTo(i)
-	if e.Open != nil {
-		e.Open()
-	}
+	n.batch(func() {
+		n.PopTo(i)
+		if e.Open != nil {
+			e.Open()
+		}
+	})
 }
 
 // showChildren opens the chevron menu of layer i below anchor, asking the

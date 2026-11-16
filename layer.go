@@ -7,11 +7,16 @@ import (
 )
 
 // Layer is one view on the navigation stack. The handle stays valid after the
-// layer was dropped; changing it then has no visible effect.
+// layer was dropped: changing it then has no visible effect until Back or
+// Forward brings the layer back.
 type Layer struct {
 	nav   *Nav
 	title string
 	view  fyne.CanvasObject
+	key   string
+
+	onReturn func()
+	seen     bool // has been the top layer before
 
 	// list, when set, is asked for entries each time the menu opens.
 	list func() []Entry
@@ -58,6 +63,17 @@ func WithChildren(list func() []Entry) LayerOption {
 	}
 }
 
+// WithOnReturn calls fn whenever the layer becomes the top layer again after
+// it was covered — by a breadcrumb or menu tap, Pop, Back or Forward — but
+// not when it is first pushed. It is the place to reload a view that may
+// have gone stale in the background, for example after the user switched
+// areas further down:
+//
+//	nav.Push("Orders", list, breadcrumb.WithOnReturn(list.Reload))
+func WithOnReturn(fn func()) LayerOption {
+	return func(l *Layer) { l.onReturn = fn }
+}
+
 func (n *Nav) newLayer(title string, view fyne.CanvasObject, opts []LayerOption) *Layer {
 	if view == nil {
 		panic("breadcrumb: layer " + title + " has a nil view")
@@ -71,6 +87,9 @@ func (n *Nav) newLayer(title string, view fyne.CanvasObject, opts []LayerOption)
 
 // Title is the layer's step in the breadcrumb bar.
 func (l *Layer) Title() string { return l.title }
+
+// Key is the layer's key from [WithKey], or "".
+func (l *Layer) Key() string { return l.key }
 
 // View is the object the layer shows.
 func (l *Layer) View() fyne.CanvasObject { return l.view }

@@ -58,7 +58,7 @@ func TestBarWrapsWhenNarrow(t *testing.T) {
 func TestBarNeverNarrowerThanWidestStep(t *testing.T) {
 	test.NewTempApp(t)
 	n := deepNav(4)
-	widest := n.bar.widestStep()
+	widest := n.bar.widestUnit()
 	if got := n.bar.MinSize().Width; got != widest {
 		t.Fatalf("min width = %v, want widest step %v", got, widest)
 	}
