@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          check-latest: true
+
+      # Fyne needs the OpenGL and X11 headers to build the GLFW driver, which
+      # the demo command links against.
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-deps
+
+      # bash on every runner, including Windows: PowerShell splits an
+      # argument such as -coverprofile=coverage.out at the dot and go then
+      # looks for a package called ".out".
+      - name: Build
+        shell: bash
+        run: go build ./...
+
+      - name: Vet
+        shell: bash
+        run: go vet ./...
+
+      - name: Test
+        shell: bash
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      # The demo command is not under test; the gate covers the library.
+      - name: Coverage gate
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        env:
+          MIN_COVERAGE: "95"
+        run: |
+          grep -v '/cmd/' coverage.out > coverage.lib.out
+          total=$(go tool cover -func=coverage.lib.out | awk '/^total:/ {sub("%", "", $3); print $3}')
+          {
+            echo "### Coverage"
+            echo
+            echo "Library: **${total}%** (minimum ${MIN_COVERAGE}%)"
+            echo
+            echo '<details><summary>Per function</summary>'
+            echo
+            echo '```'
+            go tool cover -func=coverage.lib.out
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if awk -v t="$total" -v m="$MIN_COVERAGE" 'BEGIN { exit !(t < m) }'; then
+            echo "::error::coverage ${total}% is below ${MIN_COVERAGE}%"
+            exit 1
+          fi
+
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: |
+            coverage.out
+            coverage.lib.out
+
+  minimum-versions:
+    name: minimum supported versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # go.mod names both floors: the go directive is the oldest toolchain and
+      # the fyne.io/fyne/v2 requirement the oldest Fyne we support. Building
+      # with exactly those catches an accidental use of a newer API.
+      - id: floor
+        run: echo "go=$(go mod edit -json | jq -r .Go)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ steps.floor.outputs.go }}
+
+      - name: Install Linux build dependencies
+        uses: ./.github/actions/linux-deps
+
+      - name: Build and test
+        run: |
+          go build ./...
+          go test ./...
+
+  latest-fyne:
+    name: latest Fyne
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          check-latest: true
+
+      - name: Install Linux build dependencies
+        uses: ./.github/actions/linux-deps
+
+      # go.mod names the minimum, so without this nothing would ever be built
+      # against a newer Fyne than the floor.
+      - name: Build and test against the newest Fyne
+        run: |
+          go get fyne.io/fyne/v2@latest
+          go mod tidy # a newer Fyne can pull in modules go.sum does not cover
+          go build ./...
+          go test ./...
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          check-latest: true
+
+      - name: Install Linux build dependencies
+        uses: ./.github/actions/linux-deps
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go mod tidy is up to date
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest

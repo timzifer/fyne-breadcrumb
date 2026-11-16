@@ -1,0 +1,134 @@
+package breadcrumb
+
+import (
+	"slices"
+
+	"fyne.io/fyne/v2"
+)
+
+// Layer is one view on the navigation stack. The handle stays valid after the
+// layer was dropped; changing it then has no visible effect.
+type Layer struct {
+	nav   *Nav
+	title string
+	view  fyne.CanvasObject
+
+	// list, when set, is asked for entries each time the menu opens.
+	list func() []Entry
+	// entries is what the menu shows: the last answer of list, or what
+	// SetChildren gave.
+	entries []Entry
+	// chevron is set once the layer offers children at all.
+	chevron bool
+}
+
+// Entry is one item in the menu a layer opens from its chevron, see
+// [WithChildren].
+type Entry struct {
+	// Title is the menu text. The entry is checked in the menu when it
+	// equals the title of the layer currently open above.
+	Title string
+
+	// Open is called after the navigation has jumped back to the layer that
+	// offered the entry. It is expected to push the entry's view, usually
+	// with [Nav.Push]; if it pushes nothing, that layer stays on top.
+	Open func()
+
+	// Disabled shows the entry greyed out, for example as a "Loading…"
+	// placeholder while the real entries are fetched.
+	Disabled bool
+}
+
+// LayerOption configures a layer passed to [New] or [Nav.Push].
+type LayerOption func(*Layer)
+
+// WithChildren gives a layer a chevron in the breadcrumb bar. Tapping it
+// lists the layers that may stand below this one — the siblings of the layer
+// currently open above it.
+//
+// list is called just in time, each time the menu opens, and again on
+// [Layer.RefreshChildren]. It runs on the UI goroutine and should return at
+// once. Entries that take a while to fetch go through [Layer.SetChildren]:
+// list returns what is known (or a disabled placeholder) and starts the
+// fetch, which hands its result to SetChildren; an open menu follows.
+func WithChildren(list func() []Entry) LayerOption {
+	return func(l *Layer) {
+		l.list = list
+		l.chevron = true
+	}
+}
+
+func (n *Nav) newLayer(title string, view fyne.CanvasObject, opts []LayerOption) *Layer {
+	if view == nil {
+		panic("breadcrumb: layer " + title + " has a nil view")
+	}
+	l := &Layer{nav: n, title: title, view: view}
+	for _, opt := range opts {
+		opt(l)
+	}
+	return l
+}
+
+// Title is the layer's step in the breadcrumb bar.
+func (l *Layer) Title() string { return l.title }
+
+// View is the object the layer shows.
+func (l *Layer) View() fyne.CanvasObject { return l.view }
+
+// SetTitle renames the layer's step, for example once a heading has arrived
+// from a server after the layer was pushed.
+func (l *Layer) SetTitle(title string) {
+	if title == l.title {
+		return
+	}
+	l.title = title
+	if !l.onStack() {
+		return
+	}
+	l.nav.bar.rebuild()
+	if m := l.nav.menu; m != nil {
+		l.nav.redrawMenu(m.layer) // the checked entry may have changed
+	}
+}
+
+// SetChildren replaces the entries of the layer's menu. It may be called at
+// any time — before the menu was ever opened, while it is open, or after a
+// fetch started by the WithChildren list has finished. An open menu is
+// redrawn with the new entries, or closed when there are none.
+//
+// Without a WithChildren list, SetChildren alone decides the chevron: it
+// appears with the first entries and goes away with nil. With a list, the
+// next opening asks the list again.
+func (l *Layer) SetChildren(entries []Entry) {
+	l.entries = slices.Clone(entries)
+	chevron := l.list != nil || entries != nil
+	changed := chevron != l.chevron
+	l.chevron = chevron
+	if !l.onStack() {
+		return
+	}
+	if changed {
+		l.nav.bar.rebuild()
+	}
+	l.nav.redrawMenu(l)
+}
+
+// RefreshChildren asks the WithChildren list again and redraws the menu if it
+// is open. Use it when the data behind the list has changed.
+func (l *Layer) RefreshChildren() {
+	l.ask()
+	if l.onStack() {
+		l.nav.redrawMenu(l)
+	}
+}
+
+// Children returns the entries the menu currently shows.
+func (l *Layer) Children() []Entry { return slices.Clone(l.entries) }
+
+func (l *Layer) ask() {
+	if l.list != nil {
+		l.entries = slices.Clone(l.list())
+	}
+}
+
+func (l *Layer) onStack() bool { return l.nav.indexOf(l) >= 0 }
