@@ -5,6 +5,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -37,6 +38,7 @@ type Nav struct {
 
 	maxTitleWidth  float32
 	historyButtons bool
+	segmentGap     float32 // < 0: the theme default
 }
 
 // openMenu is the sibling menu currently on screen.
@@ -50,7 +52,7 @@ type openMenu struct {
 // New starts a navigation with root as its only layer. rootTitle is the
 // first step in the breadcrumb bar.
 func New(rootTitle string, root fyne.CanvasObject, opts ...LayerOption) *Nav {
-	n := &Nav{host: container.NewStack(), maxTitleWidth: DefaultMaxTitleWidth}
+	n := &Nav{host: container.NewStack(), maxTitleWidth: DefaultMaxTitleWidth, segmentGap: -1}
 	n.bar = newBar(n)
 	n.content = container.NewBorder(n.bar, nil, nil, nil, n.host)
 	n.ExtendBaseWidget(n)
@@ -135,6 +137,24 @@ func (n *Nav) SetMaxTitleWidth(w float32) {
 func (n *Nav) SetHistoryButtons(show bool) {
 	n.historyButtons = show
 	n.bar.rebuild()
+}
+
+// SetSegmentGap sets the horizontal space between the point of one step and
+// the notch of the next. 0 lets the segments touch — steps of the same colour
+// then read as one band, only the current step stands apart. A negative gap
+// restores the default, one and a half theme paddings, which follows the
+// theme.
+func (n *Nav) SetSegmentGap(gap float32) {
+	n.segmentGap = gap
+	n.bar.rebuild()
+}
+
+// SegmentGap returns the gap in use, see [Nav.SetSegmentGap].
+func (n *Nav) SegmentGap() float32 {
+	if n.segmentGap < 0 {
+		return theme.Padding() * 1.5
+	}
+	return n.segmentGap
 }
 
 // changed is called by every mutation of the stack.

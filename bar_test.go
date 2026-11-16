@@ -2,6 +2,7 @@ package breadcrumb
 
 import (
 	"fmt"
+	"math"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -71,23 +72,48 @@ func TestBarNeverNarrowerThanWidestStep(t *testing.T) {
 	}
 }
 
-func TestSegmentsNestWithAGap(t *testing.T) {
-	test.NewTempApp(t)
-	n := deepNav(3)
+// assertGap checks that every notch starts want after the point before it,
+// and that the segments nest: the next one starts before that point.
+func assertGap(t *testing.T, n *Nav, want float32) {
+	t.Helper()
 	n.bar.Resize(fyne.NewSize(5000, n.bar.MinSize().Height))
-
+	n.bar.Refresh()
 	for i := 1; i < len(n.bar.steps); i++ {
 		prev, s := n.bar.steps[i-1], n.bar.steps[i]
 		point := prev.Position().X + prev.Size().Width
 		notch := s.Position().X + s.depth()
-		// The notch reaches back under the point, leaving a gap.
 		if s.Position().X >= point {
 			t.Fatalf("step %d starts at %v, after the point before at %v: no nesting", i, s.Position().X, point)
 		}
-		if gap := notch - point; gap <= 0 || gap > 2*theme.Padding() {
-			t.Fatalf("step %d: gap between point and notch = %v", i, gap)
+		if gap := notch - point; math.Abs(float64(gap-want)) > 0.01 {
+			t.Fatalf("step %d: gap between point and notch = %v, want %v", i, gap, want)
 		}
 	}
+}
+
+func TestSegmentGap(t *testing.T) {
+	test.NewTempApp(t)
+	n := deepNav(3)
+	def := theme.Padding() * 1.5
+	if n.SegmentGap() != def {
+		t.Fatalf("default gap = %v, want %v", n.SegmentGap(), def)
+	}
+	assertGap(t, n, def)
+
+	n.SetSegmentGap(0) // touching
+	if n.SegmentGap() != 0 {
+		t.Fatal("gap 0 not kept")
+	}
+	assertGap(t, n, 0)
+
+	n.SetSegmentGap(10)
+	assertGap(t, n, 10)
+
+	n.SetSegmentGap(-3) // back to the default
+	if n.SegmentGap() != def {
+		t.Fatalf("negative gap gave %v, want the default %v", n.SegmentGap(), def)
+	}
+	assertGap(t, n, def)
 }
 
 func TestBarRendererObjectsFollowSteps(t *testing.T) {

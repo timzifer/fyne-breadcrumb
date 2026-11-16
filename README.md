@@ -44,6 +44,7 @@ a dialog: modal dialogs opened from a layer are not steps.
 | `Back()` / `Forward()` | browser-like history, see below |
 | `Route()` / `Restore(route, open)` | save and rebuild the stack |
 | `OnChanged` | called after every navigation |
+| `SetSegmentGap(g)` | space between the point of one step and the notch of the next; 0 lets them touch (steps of the same colour then merge), negative restores the theme default |
 
 ## Siblings
 

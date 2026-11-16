@@ -146,17 +146,20 @@ func (b *bar) widestItem() float32 {
 
 // arrange flows the items into rows of the given width and returns the
 // height they take. With place set it also moves and sizes them. A segment
-// following another reaches back under its point, so the two nest with a gap
-// of one and a half theme paddings between them.
+// following another reaches back under its point, so the two nest with the
+// navigation's segment gap between point and notch.
 func (b *bar) arrange(width float32, place bool) float32 {
 	pad := theme.Padding()
+	gap := b.nav.SegmentGap()
 	var x, y, rowH float32
 	var prevSeg bool
 	for _, o := range b.items() {
 		s := o.MinSize()
 		_, isSeg := o.(*segment)
 		if x > 0 && isSeg && prevSeg {
-			x -= s.Height*arrowRatio - pad/2 // nest under the point before
+			// x is one padding past the point before; move back so the notch
+			// starts gap after it.
+			x += gap - pad - s.Height*arrowRatio
 		}
 		if x > 0 && x+s.Width > width {
 			x, y, rowH = 0, y+rowH+pad, 0
