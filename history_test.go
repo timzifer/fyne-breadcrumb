@@ -162,8 +162,15 @@ func TestShortcuts(t *testing.T) {
 	n := New("A", view("a"))
 	w := test.NewWindow(n)
 	defer w.Close()
-	n.BindShortcuts(w.Canvas())
-	press := func(s fyne.Shortcut) { w.Canvas().(fyne.Shortcutable).TypedShortcut(s) }
+	c := &shortcutCanvas{Canvas: w.Canvas(), handlers: map[string]func(fyne.Shortcut){}}
+	n.BindShortcuts(c)
+	press := func(s fyne.Shortcut) {
+		h, ok := c.handlers[s.ShortcutName()]
+		if !ok {
+			t.Fatalf("%s not bound", s.ShortcutName())
+		}
+		h(s)
+	}
 
 	n.Push("B", view("b"))
 	n.Push("C", view("c"))
@@ -173,6 +180,19 @@ func TestShortcuts(t *testing.T) {
 	assertTitles(t, n, "A", "B", "C")
 	press(ShortcutForward)
 	assertTitles(t, n, "A", "B")
+}
+
+// shortcutCanvas records the shortcuts added to it. The test canvas of
+// Fyne 2.6 dispatches shortcuts itself, the one of 2.8 no longer does, so
+// the test does its own dispatching to run against both.
+type shortcutCanvas struct {
+	fyne.Canvas
+	handlers map[string]func(fyne.Shortcut)
+}
+
+func (c *shortcutCanvas) AddShortcut(s fyne.Shortcut, h func(fyne.Shortcut)) {
+	c.handlers[s.ShortcutName()] = h
+	c.Canvas.AddShortcut(s, h)
 }
 
 func TestStepsAreFocusable(t *testing.T) {
