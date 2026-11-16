@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -114,6 +115,12 @@ func (r *barRenderer) Refresh() {
 	for _, o := range r.objects {
 		o.Refresh()
 	}
+	// The children may all be new. The GL driver only knows the canvas of
+	// objects it has drawn before, so their own refreshes are dropped, and
+	// BaseWidget.Refresh does not tell the canvas either: without this, a
+	// change that touches only the bar (an async SetTitle, say) stays
+	// invisible until something else redraws the window.
+	canvas.Refresh(r.bar)
 }
 
 func (r *barRenderer) Layout(size fyne.Size) {
