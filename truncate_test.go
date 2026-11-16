@@ -60,16 +60,15 @@ func TestBarShowsShortenedTitle(t *testing.T) {
 	test.NewTempApp(t)
 	long := "Order 66340 – Customer Plant Hall 2 Press Line B with a very long name"
 	n := New(long, view("a"))
-	crumb := n.bar.steps[0].crumb
-	if !strings.Contains(crumb.Text, ellipsis) {
-		t.Fatalf("crumb text %q not shortened", crumb.Text)
+	if title := n.bar.steps[0].title; !strings.Contains(title, ellipsis) {
+		t.Fatalf("step title %q not shortened", title)
 	}
 	if n.Titles()[0] != long || n.Root().Title() != long {
 		t.Fatal("full title lost")
 	}
 
 	n.SetMaxTitleWidth(0)
-	if n.bar.steps[0].crumb.Text != long {
+	if n.bar.steps[0].title != long {
 		t.Fatal("shortening not turned off")
 	}
 	n.SetMaxTitleWidth(-5)

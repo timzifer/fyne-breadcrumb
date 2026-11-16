@@ -51,12 +51,9 @@ type Entry struct {
 type LayerOption func(*Layer)
 
 // WithChildren makes a layer offer the layers that may stand below it. The
-// layer itself shows no menu; the step of whichever of them is open above it
-// gets a down chevron that lists them as its siblings:
-//
-//	Plant › Hall 2 ⌄ › Press A
-//
-// Plant offers the halls, so Hall 2 carries the chevron. The offering stays
+// layer itself shows no menu; the segment of whichever of them is open above
+// it gets a small down chevron that lists them as its siblings: when Plant
+// offers the halls and Hall 2 is open, Hall 2 carries the chevron. The offering stays
 // with the parent because the parent is what knows — and fetches — the
 // list, and a child pushed straight from the parent's view gets its chevron
 // without further ado.

@@ -6,6 +6,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
+	"fyne.io/fyne/v2/theme"
 )
 
 func deepNav(layers int) *Nav {
@@ -19,7 +20,7 @@ func deepNav(layers int) *Nav {
 func rows(b *bar) int {
 	ys := map[float32]bool{}
 	for _, s := range b.steps {
-		ys[s.crumb.Position().Y] = true
+		ys[s.Position().Y] = true
 	}
 	return len(ys)
 }
@@ -34,10 +35,10 @@ func TestBarRunsInOneRowWhenItFits(t *testing.T) {
 	}
 	var x float32 = -1
 	for _, s := range n.bar.steps {
-		if s.crumb.Position().X <= x {
+		if s.Position().X <= x {
 			t.Fatal("steps are not left to right")
 		}
-		x = s.crumb.Position().X
+		x = s.Position().X
 	}
 }
 
@@ -58,7 +59,7 @@ func TestBarWrapsWhenNarrow(t *testing.T) {
 func TestBarNeverNarrowerThanWidestStep(t *testing.T) {
 	test.NewTempApp(t)
 	n := deepNav(4)
-	widest := n.bar.widestUnit()
+	widest := n.bar.widestItem()
 	if got := n.bar.MinSize().Width; got != widest {
 		t.Fatalf("min width = %v, want widest step %v", got, widest)
 	}
@@ -70,22 +71,21 @@ func TestBarNeverNarrowerThanWidestStep(t *testing.T) {
 	}
 }
 
-func TestSeparatorStaysWithItsCrumb(t *testing.T) {
+func TestSegmentsNestWithAGap(t *testing.T) {
 	test.NewTempApp(t)
-	n := deepNav(6)
-	n.bar.Resize(fyne.NewSize(n.bar.MinSize().Width, 100))
+	n := deepNav(3)
+	n.bar.Resize(fyne.NewSize(5000, n.bar.MinSize().Height))
 
-	for i, s := range n.bar.steps {
-		if s.sep == nil {
-			continue
+	for i := 1; i < len(n.bar.steps); i++ {
+		prev, s := n.bar.steps[i-1], n.bar.steps[i]
+		point := prev.Position().X + prev.Size().Width
+		notch := s.Position().X + s.depth()
+		// The notch reaches back under the point, leaving a gap.
+		if s.Position().X >= point {
+			t.Fatalf("step %d starts at %v, after the point before at %v: no nesting", i, s.Position().X, point)
 		}
-		if s.sep.Position().X <= s.crumb.Position().X {
-			t.Fatalf("step %d: separator left of its crumb", i)
-		}
-		cy := s.crumb.Position().Y + s.crumb.Size().Height/2
-		sy := s.sep.Position().Y + s.sep.Size().Height/2
-		if cy != sy {
-			t.Fatalf("step %d: separator on another row than its crumb", i)
+		if gap := notch - point; gap <= 0 || gap > 2*theme.Padding() {
+			t.Fatalf("step %d: gap between point and notch = %v", i, gap)
 		}
 	}
 }
@@ -94,9 +94,8 @@ func TestBarRendererObjectsFollowSteps(t *testing.T) {
 	test.NewTempApp(t)
 	n := deepNav(3)
 	r := test.TempWidgetRenderer(t, n.bar)
-	// 3 crumbs + 2 separators
-	if got := len(r.Objects()); got != 5 {
-		t.Fatalf("objects = %d, want 5", got)
+	if got := len(r.Objects()); got != 3 {
+		t.Fatalf("objects = %d, want one per step", got)
 	}
 	n.PopTo(0)
 	if got := len(r.Objects()); got != 1 {

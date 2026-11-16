@@ -227,10 +227,10 @@ func (n *Nav) openEntry(l *Layer, e Entry) {
 	})
 }
 
-// showChildren opens the entries of layer i below anchor — the sibling
-// chevron on the step above — asking the layer's list function for fresh
-// entries first.
-func (n *Nav) showChildren(i int, anchor fyne.CanvasObject) {
+// showChildren opens the entries of layer i at position at of anchor — below
+// the sibling chevron of the step above — asking the layer's list function
+// for fresh entries first.
+func (n *Nav) showChildren(i int, anchor fyne.CanvasObject, at fyne.Position) {
 	l := n.Layer(i)
 	if l == nil {
 		return
@@ -242,7 +242,7 @@ func (n *Nav) showChildren(i int, anchor fyne.CanvasObject) {
 		return
 	}
 	n.closeMenu()
-	pos := drv.AbsolutePositionForObject(anchor).AddXY(0, anchor.Size().Height)
+	pos := drv.AbsolutePositionForObject(anchor).Add(at)
 	n.menu = &openMenu{layer: l, canvas: c, pos: pos}
 	n.redrawMenu(l)
 }

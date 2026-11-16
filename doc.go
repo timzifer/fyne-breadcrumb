@@ -1,6 +1,7 @@
 // Package breadcrumb provides a layered navigation controller for [Fyne]
 // applications: views are kept as a stack, and a breadcrumb bar on top shows
-// one step per layer.
+// one step per layer, drawn as arrow segments that nest into each other in
+// the colours of the Fyne theme.
 //
 // Opening a sub view pushes a layer onto the stack; tapping an earlier step
 // in the bar jumps back to it and drops everything above. Every layer keeps
@@ -21,11 +22,12 @@
 //
 // # Siblings
 //
-// A layer can offer the layers that may stand below it. The step of the one
-// open above it then carries a down chevron, "Plant › Hall 2 ⌄ › Press A":
-// tapping it lists the siblings of Hall 2, Hall 2 itself checked, and
-// picking one replaces Hall 2 — and everything above it — with that sibling.
-// The separator › stays a plain separator; the root has no siblings.
+// A layer can offer the layers that may stand below it. The segment of the
+// one open above it then carries a small down chevron after its title:
+// tapping the chevron lists the siblings of that step, itself checked, and
+// picking one replaces the step — and everything above it — with that
+// sibling. Tapping the title still jumps to the step. The root has no
+// siblings.
 //
 //	nav := breadcrumb.New("Plant", plantView, breadcrumb.WithChildren(func() []breadcrumb.Entry {
 //		return []breadcrumb.Entry{

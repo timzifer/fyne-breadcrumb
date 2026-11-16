@@ -25,7 +25,7 @@ func assertTitles(t *testing.T, n *Nav, want ...string) {
 func crumbTexts(n *Nav) []string {
 	var texts []string
 	for _, s := range n.bar.steps {
-		texts = append(texts, s.crumb.Text)
+		texts = append(texts, s.title)
 	}
 	return texts
 }
@@ -42,11 +42,8 @@ func TestNewShowsRoot(t *testing.T) {
 	if len(n.host.Objects) != 1 || n.host.Objects[0] != root {
 		t.Fatal("host does not show the root")
 	}
-	if n.bar.steps[0].sep != nil {
-		t.Fatal("a lone root without children must not show a separator")
-	}
-	if n.bar.steps[0].crumb.Importance != widget.HighImportance {
-		t.Fatal("the current step must be highlighted")
+	if root := n.bar.steps[0]; !root.first || !root.current {
+		t.Fatal("a lone root is the first and the current step")
 	}
 }
 
@@ -67,19 +64,19 @@ func TestPushShowsNewLayerAndKeepsOldViews(t *testing.T) {
 		t.Fatalf("crumbs = %q", crumbTexts(n))
 	}
 	first, last := n.bar.steps[0], n.bar.steps[1]
-	if first.crumb.Importance != widget.LowImportance || last.crumb.Importance != widget.HighImportance {
+	if first.current || !last.current {
 		t.Fatal("only the last step may be highlighted")
 	}
-	if first.sep == nil || first.sep.Text != separator {
-		t.Fatal("steps must be separated by a plain ›")
+	if !first.first || last.first {
+		t.Fatal("only the root has a straight left edge")
 	}
-	if last.sep != nil {
-		t.Fatal("the last step must not end in a separator")
+	if last.prev != first {
+		t.Fatal("a step does not know the one before")
 	}
-	if first.siblings != nil || last.siblings != nil {
+	if first.onSiblings != nil || last.onSiblings != nil {
 		t.Fatal("sibling chevron without siblings")
 	}
-	if last.crumb.OnTapped != nil {
+	if last.onTap != nil {
 		t.Fatal("the current step must not be tappable")
 	}
 }
@@ -136,13 +133,13 @@ func TestTappingCrumbJumpsBack(t *testing.T) {
 	w := test.NewWindow(n)
 	defer w.Close()
 
-	test.Tap(n.bar.steps[1].crumb)
+	test.Tap(n.bar.steps[1])
 	assertTitles(t, n, "A", "B")
 
-	test.Tap(n.bar.steps[1].crumb) // current step: no-op
+	test.Tap(n.bar.steps[1]) // current step: no-op
 	assertTitles(t, n, "A", "B")
 
-	test.Tap(n.bar.steps[0].crumb)
+	test.Tap(n.bar.steps[0])
 	assertTitles(t, n, "A")
 }
 

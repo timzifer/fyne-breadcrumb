@@ -198,7 +198,6 @@ func TestStepsAreFocusable(t *testing.T) {
 	test.NewTempApp(t)
 	n := New("A", view("a"), WithChildren(func() []Entry { return nil }))
 	n.Push("B", view("b"))
-	// Tab reaches every step and chevron, Space activates it.
-	var _ fyne.Focusable = n.bar.steps[0].crumb
-	var _ fyne.Focusable = n.bar.steps[1].siblings
+	// Tab reaches every step; keys are covered in segment_test.go.
+	var _ fyne.Focusable = n.bar.steps[0]
 }

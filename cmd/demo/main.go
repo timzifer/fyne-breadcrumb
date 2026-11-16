@@ -33,7 +33,7 @@ func main() {
 	d := &demo{visits: widget.NewLabel("")}
 
 	// The halls are known locally: the list is simply asked each time the
-	// chevron on the open hall's step opens.
+	// chevron on the open hall's segment opens.
 	root := container.NewVBox(picker("Pick a hall", halls, d.pushHall), d.visits)
 	d.nav = breadcrumb.New("Plant", container.NewPadded(root),
 		breadcrumb.WithChildren(func() []breadcrumb.Entry {

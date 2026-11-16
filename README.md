@@ -4,19 +4,13 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/timzifer/fyne-breadcrumb.svg)](https://pkg.go.dev/github.com/timzifer/fyne-breadcrumb)
 
 Layered navigation for [Fyne](https://fyne.io) applications: views kept as a
-stack, with a breadcrumb bar on top — and, like the address bar of Windows
-Explorer, a chevron on a step that lists its siblings. With browser-like
+stack, with a breadcrumb bar of arrow segments on top — in the colours of
+the Fyne theme — and, like the address bar of Windows Explorer, a chevron on a
+step that lists its siblings. With browser-like
 back and forward, keyboard shortcuts, hooks for stale layers and a saveable
 route.
 
-```
-Plant › Hall 2 ⌄ › Press A ⌄
-        ┌──────────┐
-        │   Hall 1 │
-        │ ✓ Hall 2 │
-        │   Hall 3 │
-        └──────────┘
-```
+![Breadcrumb bar with an open sibling menu](docs/bar.png)
 
 ```
 go get github.com/timzifer/fyne-breadcrumb
@@ -54,10 +48,10 @@ a dialog: modal dialogs opened from a layer are not steps.
 ## Siblings
 
 A layer can offer the layers that may stand below it. The step of the one
-that is open then carries its own down chevron `⌄`, right after its title:
-tapping it lists its siblings, itself checked, and picking one replaces it —
-and everything above — with that sibling. The separator `›` stays a plain
-separator, and the root has no siblings.
+that is open then carries a small down chevron after its title: tapping the
+chevron lists its siblings, itself checked, and picking one replaces it — and
+everything above — with that sibling. Tapping the title still jumps to the
+step, and the root has no siblings.
 
 The parent supplies the list, not the child: it is the one that knows and
 fetches it, and a child pushed straight from the parent's view gets its
@@ -108,8 +102,8 @@ nav.SetHistoryButtons(true)    // ← → in front of the steps
 nav.BindShortcuts(win.Canvas()) // Alt+Left, Alt+Right, Alt+Up (one layer up)
 ```
 
-Steps and sibling chevrons are ordinary buttons: Tab reaches them, Space activates
-them, and an open menu takes the arrow keys, Enter and Escape. Fyne gives a
+Steps take the focus: Tab reaches them, Space or Enter jumps to one, Down
+opens its siblings, and an open menu takes the arrow keys, Enter and Escape. Fyne gives a
 focused text entry the first say on shortcuts, so the Alt shortcuts work while
 nothing or a button has the focus; bind `Back`, `Forward` and `Pop` to main
 menu items to have them while typing.
