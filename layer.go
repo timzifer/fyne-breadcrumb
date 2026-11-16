@@ -15,6 +15,10 @@ type Layer struct {
 	view  fyne.CanvasObject
 	key   string
 
+	// icon is drawn in the layer's segment, placed by iconAt; nil shows none.
+	icon   fyne.Resource
+	iconAt IconPlacement
+
 	onReturn func()
 	seen     bool // has been the top layer before
 
@@ -47,6 +51,16 @@ type Entry struct {
 	Disabled bool
 }
 
+// IconPlacement says on which side of the step's title its icon stands.
+type IconPlacement int
+
+const (
+	// IconLeading puts the icon before the title (the default).
+	IconLeading IconPlacement = iota
+	// IconTrailing puts the icon after the title, before a sibling chevron.
+	IconTrailing
+)
+
 // LayerOption configures a layer passed to [New] or [Nav.Push].
 type LayerOption func(*Layer)
 
@@ -68,6 +82,12 @@ func WithChildren(list func() []Entry) LayerOption {
 		l.list = list
 		l.chevron = true
 	}
+}
+
+// WithIcon shows res in the layer's segment, at the given side of the title.
+// Use [Layer.SetIcon] to change or remove it later.
+func WithIcon(res fyne.Resource, at IconPlacement) LayerOption {
+	return func(l *Layer) { l.icon, l.iconAt = res, at }
 }
 
 // WithOnReturn calls fn whenever the layer becomes the top layer again after
@@ -94,6 +114,16 @@ func (n *Nav) newLayer(title string, view fyne.CanvasObject, opts []LayerOption)
 
 // Title is the layer's step in the breadcrumb bar.
 func (l *Layer) Title() string { return l.title }
+
+// SetIcon sets or, with res nil, removes the icon of the layer's step. It
+// takes effect at once, also while the layer is on the stack.
+func (l *Layer) SetIcon(res fyne.Resource, at IconPlacement) {
+	l.icon, l.iconAt = res, at
+	if !l.onStack() {
+		return
+	}
+	l.nav.bar.rebuild()
+}
 
 // Key is the layer's key from [WithKey], or "".
 func (l *Layer) Key() string { return l.key }

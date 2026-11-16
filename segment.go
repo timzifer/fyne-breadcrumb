@@ -25,6 +25,10 @@ type segment struct {
 	first   bool
 	current bool
 
+	// icon stands before (IconLeading) or after the title; nil shows none.
+	icon   fyne.Resource
+	iconAt IconPlacement
+
 	// onTap jumps to this step; nil on the current one.
 	onTap func()
 	// onSiblings opens the sibling menu below the given position, relative
@@ -67,8 +71,34 @@ func (s *segment) titleSize() fyne.Size {
 // chevronX is where the sibling chevron starts, in segment coordinates.
 func (s *segment) chevronX() float32 {
 	left, _ := s.insets(s.Size().Height)
-	return left + s.titleSize().Width + theme.Padding()
+	return left + s.iconLead() + s.titleSize().Width + s.iconTrail() + theme.Padding()
 }
+
+// iconWidth is the room the icon and the gap to the title take, 0 without an icon.
+func (s *segment) iconWidth() float32 {
+	if s.icon == nil {
+		return 0
+	}
+	return iconSize() + theme.Padding()
+}
+
+// iconLead is the room in front of the title taken by a leading icon.
+func (s *segment) iconLead() float32 {
+	if s.icon != nil && s.iconAt == IconLeading {
+		return s.iconWidth()
+	}
+	return 0
+}
+
+// iconTrail is the room behind the title taken by a trailing icon.
+func (s *segment) iconTrail() float32 {
+	if s.icon != nil && s.iconAt == IconTrailing {
+		return s.iconWidth()
+	}
+	return 0
+}
+
+func iconSize() float32 { return theme.IconInlineSize() }
 
 // chevronZone is where the sibling zone starts; a tap at or right of it
 // opens the menu.
@@ -161,16 +191,21 @@ type segmentRenderer struct {
 	shape   *canvas.Raster
 	text    *canvas.Text
 	chevron *canvas.Image
+	icon    *canvas.Image // nil until the segment has an icon once
 	fill    color.NRGBA
 }
 
 func (r *segmentRenderer) Destroy() {}
 
 func (r *segmentRenderer) Objects() []fyne.CanvasObject {
-	if r.seg.onSiblings == nil {
-		return []fyne.CanvasObject{r.shape, r.text}
+	out := []fyne.CanvasObject{r.shape, r.text}
+	if r.seg.icon != nil && r.icon != nil {
+		out = append(out, r.icon)
 	}
-	return []fyne.CanvasObject{r.shape, r.text, r.chevron}
+	if r.seg.onSiblings != nil {
+		out = append(out, r.chevron)
+	}
+	return out
 }
 
 func chevronSize() float32 { return theme.IconInlineSize() * 0.7 }
@@ -179,7 +214,7 @@ func (r *segmentRenderer) MinSize() fyne.Size {
 	ts := r.seg.titleSize()
 	h := ts.Height + 2*theme.InnerPadding()
 	left, right := r.seg.insets(h)
-	w := left + ts.Width + right
+	w := left + r.seg.iconWidth() + ts.Width + right
 	if r.seg.onSiblings != nil {
 		w += theme.Padding() + chevronSize()
 	}
@@ -191,8 +226,17 @@ func (r *segmentRenderer) Layout(size fyne.Size) {
 	r.shape.Move(fyne.NewPos(0, 0))
 	left, _ := r.seg.insets(size.Height)
 	ts := r.text.MinSize()
-	r.text.Move(fyne.NewPos(left, (size.Height-ts.Height)/2))
+	r.text.Move(fyne.NewPos(left+r.seg.iconLead(), (size.Height-ts.Height)/2))
 	r.text.Resize(ts)
+	if r.icon != nil {
+		is := iconSize()
+		x := left
+		if r.seg.iconAt == IconTrailing {
+			x = left + r.seg.iconLead() + ts.Width + theme.Padding()
+		}
+		r.icon.Resize(fyne.NewSquareSize(is))
+		r.icon.Move(fyne.NewPos(x, (size.Height-is)/2))
+	}
 	cs := chevronSize()
 	r.chevron.Resize(fyne.NewSquareSize(cs))
 	r.chevron.Move(fyne.NewPos(r.seg.chevronX(), (size.Height-cs)/2))
@@ -219,6 +263,14 @@ func (r *segmentRenderer) Refresh() {
 	r.text.Color = th.Color(fg, v)
 	r.text.TextSize = th.Size(theme.SizeNameText)
 	r.chevron.Resource = theme.NewColoredResource(siblingsIcon, fg)
+	if s.icon != nil {
+		if r.icon == nil {
+			r.icon = canvas.NewImageFromResource(s.icon)
+			r.icon.FillMode = canvas.ImageFillContain
+		}
+		r.icon.Resource = theme.NewColoredResource(s.icon, fg)
+		r.icon.Refresh()
+	}
 
 	r.Layout(s.Size())
 	r.shape.Refresh()
