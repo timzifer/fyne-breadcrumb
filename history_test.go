@@ -5,7 +5,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
-	"fyne.io/fyne/v2/widget"
 )
 
 func TestBackAndForwardWalkTheHistory(t *testing.T) {
@@ -201,5 +200,5 @@ func TestStepsAreFocusable(t *testing.T) {
 	n.Push("B", view("b"))
 	// Tab reaches every step and chevron, Space activates it.
 	var _ fyne.Focusable = n.bar.steps[0].crumb
-	var _ fyne.Focusable = n.bar.steps[0].sep.(*widget.Button)
+	var _ fyne.Focusable = n.bar.steps[1].siblings
 }

@@ -70,11 +70,14 @@ func TestPushShowsNewLayerAndKeepsOldViews(t *testing.T) {
 	if first.crumb.Importance != widget.LowImportance || last.crumb.Importance != widget.HighImportance {
 		t.Fatal("only the last step may be highlighted")
 	}
-	if _, ok := first.sep.(*widget.Label); !ok {
-		t.Fatalf("separator between steps = %T, want *widget.Label", first.sep)
+	if first.sep == nil || first.sep.Text != separator {
+		t.Fatal("steps must be separated by a plain ›")
 	}
 	if last.sep != nil {
-		t.Fatal("last step without children must not end in a separator")
+		t.Fatal("the last step must not end in a separator")
+	}
+	if first.siblings != nil || last.siblings != nil {
+		t.Fatal("sibling chevron without siblings")
 	}
 	if last.crumb.OnTapped != nil {
 		t.Fatal("the current step must not be tappable")

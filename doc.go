@@ -21,11 +21,11 @@
 //
 // # Siblings
 //
-// Like the address bar of Windows Explorer, a layer can list the layers that
-// may stand below it. The bar then shows a chevron after that step; tapping
-// it opens a menu of those entries, with the one currently open checked.
-// Picking an entry jumps back to the step and opens the entry on top of it,
-// which makes the siblings of any open layer one tap away:
+// A layer can offer the layers that may stand below it. The step of the one
+// open above it then carries a down chevron, "Plant › Hall 2 ⌄ › Press A":
+// tapping it lists the siblings of Hall 2, Hall 2 itself checked, and
+// picking one replaces Hall 2 — and everything above it — with that sibling.
+// The separator › stays a plain separator; the root has no siblings.
 //
 //	nav := breadcrumb.New("Plant", plantView, breadcrumb.WithChildren(func() []breadcrumb.Entry {
 //		return []breadcrumb.Entry{

@@ -9,7 +9,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// plant builds a root "Plant" that offers halls from its chevron.
+// plant builds a root "Plant" that offers halls; once a hall is open, its
+// step carries the chevron listing them.
 func plant(t *testing.T, halls ...string) (*Nav, *int) {
 	t.Helper()
 	asked := 0
@@ -40,7 +41,8 @@ func menuLabels(m *fyne.Menu) (labels []string, checked []bool) {
 	return labels, checked
 }
 
-// shown opens the chevron of layer i in a window and returns the window.
+// shown opens, in a window, the chevron listing the entries layer i offers —
+// the one on the step of the layer open above i — and returns the window.
 func shown(t *testing.T, n *Nav, i int) fyne.Window {
 	t.Helper()
 	w := test.NewWindow(n)
@@ -50,11 +52,16 @@ func shown(t *testing.T, n *Nav, i int) fyne.Window {
 	return w
 }
 
+// chevronOf returns the sibling chevron that lists what layer i offers. It
+// sits on the step above i, next to the title of the sibling that is open.
 func chevronOf(t *testing.T, n *Nav, i int) *widget.Button {
 	t.Helper()
-	b, ok := n.bar.steps[i].sep.(*widget.Button)
-	if !ok {
-		t.Fatalf("step %d: separator = %T, want a chevron button", i, n.bar.steps[i].sep)
+	if i+1 >= len(n.bar.steps) {
+		t.Fatalf("nothing open above layer %d: no step to carry its chevron", i)
+	}
+	b := n.bar.steps[i+1].siblings
+	if b == nil {
+		t.Fatalf("step %d has no sibling chevron", i+1)
 	}
 	return b
 }
@@ -69,23 +76,60 @@ func topPopUp(n *Nav, w fyne.Window) *widget.PopUpMenu {
 	return n.menu.pop
 }
 
-func TestChildrenShowChevron(t *testing.T) {
+func TestSiblingChevronSitsOnTheChild(t *testing.T) {
 	test.NewTempApp(t)
 	n, _ := plant(t, "Hall 1")
-
-	if chevronOf(t, n, 0).Text != separator {
-		t.Fatal("chevron has the wrong text")
+	if n.bar.steps[0].siblings != nil {
+		t.Fatal("the root has no siblings, so no chevron")
 	}
+
 	n.Push("Hall 1", view("hall 1"))
-	chevronOf(t, n, 0) // still there after a push
+	c := chevronOf(t, n, 0)
+	if c.Icon != siblingsIcon || c.Text != "" {
+		t.Fatalf("chevron shows %q / %v, want the down chevron icon only", c.Text, c.Icon)
+	}
+	if n.bar.steps[0].sep == nil || n.bar.steps[0].sep.Text != separator {
+		t.Fatal("the separator between steps must stay a plain ›")
+	}
 	if n.bar.steps[1].sep != nil {
-		t.Fatal("last layer without children must not end in a separator")
+		t.Fatal("the last step must not end in a separator")
+	}
+
+	n.Push("Machine", view("m")) // Hall 1 offers nothing
+	if n.bar.steps[2].siblings != nil {
+		t.Fatal("a layer whose parent offers nothing got a chevron")
+	}
+	if n.bar.steps[1].siblings == nil {
+		t.Fatal("chevron lost after a push")
+	}
+}
+
+func TestSiblingChevronIsPlacedBetweenTitleAndSeparator(t *testing.T) {
+	test.NewTempApp(t)
+	n, _ := plant(t, "Hall 1")
+	n.Push("Hall 1", view("hall 1"))
+	n.Push("Machine", view("m"))
+	n.bar.Resize(fyne.NewSize(2000, n.bar.MinSize().Height))
+
+	s := n.bar.steps[1]
+	if !(s.crumb.Position().X < s.siblings.Position().X && s.siblings.Position().X < s.sep.Position().X) {
+		t.Fatalf("order on the row: crumb %v, chevron %v, separator %v",
+			s.crumb.Position().X, s.siblings.Position().X, s.sep.Position().X)
+	}
+	// The chevron belongs to its title: no gap between them, a gap before
+	// the separator.
+	if end := s.crumb.Position().X + s.crumb.Size().Width; s.siblings.Position().X != end {
+		t.Fatalf("chevron at x=%v, title ends at %v", s.siblings.Position().X, end)
+	}
+	if end := s.siblings.Position().X + s.siblings.Size().Width; s.sep.Position().X <= end {
+		t.Fatal("separator glued to the chevron")
 	}
 }
 
 func TestListIsAskedJustInTime(t *testing.T) {
 	test.NewTempApp(t)
 	n, asked := plant(t, "Hall 1", "Hall 2")
+	n.Push("Hall 1", view("hall 1"))
 	if *asked != 0 {
 		t.Fatalf("list asked %d times before the menu opened", *asked)
 	}
@@ -106,6 +150,7 @@ func TestListIsAskedJustInTime(t *testing.T) {
 func TestMenuOpensBelowChevron(t *testing.T) {
 	test.NewTempApp(t)
 	n, _ := plant(t, "Hall 1")
+	n.Push("Hall 1", view("hall 1"))
 	w := shown(t, n, 0)
 
 	chevron := chevronOf(t, n, 0)
@@ -165,15 +210,15 @@ func TestSetChildrenDecidesChevron(t *testing.T) {
 	test.NewTempApp(t)
 	n := New("A", view("a"))
 	n.Push("B", view("b"))
-	if _, ok := n.bar.steps[0].sep.(*widget.Label); !ok {
-		t.Fatal("plain separator expected before any children")
+	if n.bar.steps[1].siblings != nil {
+		t.Fatal("chevron before any siblings")
 	}
 
 	n.Root().SetChildren([]Entry{{Title: "B"}, {Title: "C"}})
 	chevronOf(t, n, 0)
 
 	n.Root().SetChildren(nil)
-	if _, ok := n.bar.steps[0].sep.(*widget.Label); !ok {
+	if n.bar.steps[1].siblings != nil {
 		t.Fatal("chevron must go away with nil children")
 	}
 }
@@ -183,6 +228,7 @@ func TestSetChildrenUpdatesOpenMenu(t *testing.T) {
 	var n *Nav
 	loading := []Entry{{Title: "Loading…", Disabled: true}}
 	n = New("Plant", view("plant"), WithChildren(func() []Entry { return loading }))
+	n.Push("Hall 1", view("hall 1"))
 	w := shown(t, n, 0)
 	first := topPopUp(n, w)
 
@@ -232,6 +278,7 @@ func TestSetChildrenEmptyClosesOpenMenu(t *testing.T) {
 	test.NewTempApp(t)
 	n := New("A", view("a"))
 	n.Root().SetChildren([]Entry{{Title: "x"}})
+	n.Push("x", view("x"))
 	w := shown(t, n, 0)
 
 	n.Root().SetChildren([]Entry{})
@@ -249,6 +296,7 @@ func TestRefreshChildrenAsksListAgain(t *testing.T) {
 	var n *Nav
 	halls := []string{"Hall 1"}
 	n = New("Plant", view("plant"), WithChildren(func() []Entry { return hallEntries(&n, halls...) }))
+	n.Push("Hall 1", view("hall 1"))
 	w := shown(t, n, 0)
 	first := topPopUp(n, w)
 
@@ -280,6 +328,7 @@ func TestOtherLayersMenuIsNotTouched(t *testing.T) {
 func TestDismissClearsMenuState(t *testing.T) {
 	test.NewTempApp(t)
 	n, _ := plant(t, "Hall 1")
+	n.Push("Hall 1", view("hall 1"))
 	w := shown(t, n, 0)
 
 	topPopUp(n, w).Dismiss()
@@ -293,6 +342,7 @@ func TestDroppingMenuLayerClosesMenu(t *testing.T) {
 	n, _ := plant(t, "Hall 1")
 	hall := n.Push("Hall 1", view("hall 1"))
 	hall.SetChildren([]Entry{{Title: "Machine A"}})
+	n.Push("Machine A", view("m"))
 	w := shown(t, n, 1)
 	open := topPopUp(n, w)
 
@@ -371,6 +421,7 @@ func TestNoMenuWithoutEntries(t *testing.T) {
 	if n.childMenu(-1) != nil || n.childMenu(5) != nil {
 		t.Fatal("out of range index produced a menu")
 	}
+	n.Push("B", view("b"))
 	w := shown(t, n, 0)
 	if topPopUp(n, w) != nil {
 		t.Fatal("tap on an empty chevron opened a menu")

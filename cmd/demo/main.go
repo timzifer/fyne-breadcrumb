@@ -1,7 +1,7 @@
 // Command demo shows fyne-breadcrumb on a small plant: halls offered just in
-// time from the root's chevron, machines fetched in the background, a title
-// that only arrives after its layer was pushed, back and forward with buttons
-// and Alt+Left/Right/Up, and the stack restored after a restart.
+// time by the root, machines fetched in the background, a title that only
+// arrives after its layer was pushed, back and forward with buttons and
+// Alt+Left/Right/Up, and the stack restored after a restart.
 package main
 
 import (
@@ -33,7 +33,7 @@ func main() {
 	d := &demo{visits: widget.NewLabel("")}
 
 	// The halls are known locally: the list is simply asked each time the
-	// root's chevron opens.
+	// chevron on the open hall's step opens.
 	root := container.NewVBox(picker("Pick a hall", halls, d.pushHall), d.visits)
 	d.nav = breadcrumb.New("Plant", container.NewPadded(root),
 		breadcrumb.WithChildren(func() []breadcrumb.Entry {

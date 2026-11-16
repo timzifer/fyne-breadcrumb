@@ -23,20 +23,23 @@ type Layer struct {
 	// entries is what the menu shows: the last answer of list, or what
 	// SetChildren gave.
 	entries []Entry
-	// chevron is set once the layer offers children at all.
+	// chevron is set once the layer offers children at all; the step of
+	// the child open above it then carries the sibling chevron.
 	chevron bool
 }
 
-// Entry is one item in the menu a layer opens from its chevron, see
-// [WithChildren].
+// Entry is one item a layer offers for the layer above it, listed in the
+// sibling menu of that layer's step; see [WithChildren].
 type Entry struct {
-	// Title is the menu text. The entry is checked in the menu when it
-	// equals the title of the layer currently open above.
+	// Title is the menu text. The entry is checked when it equals the
+	// title of the layer currently open above — the one whose step the menu
+	// was opened from.
 	Title string
 
 	// Open is called after the navigation has jumped back to the layer that
-	// offered the entry. It is expected to push the entry's view, usually
-	// with [Nav.Push]; if it pushes nothing, that layer stays on top.
+	// offered the entry, dropping the sibling it replaces. It is expected to
+	// push the entry's view, usually with [Nav.Push]; if it pushes nothing,
+	// the offering layer stays on top.
 	Open func()
 
 	// Disabled shows the entry greyed out, for example as a "Loading…"
@@ -47,9 +50,16 @@ type Entry struct {
 // LayerOption configures a layer passed to [New] or [Nav.Push].
 type LayerOption func(*Layer)
 
-// WithChildren gives a layer a chevron in the breadcrumb bar. Tapping it
-// lists the layers that may stand below this one — the siblings of the layer
-// currently open above it.
+// WithChildren makes a layer offer the layers that may stand below it. The
+// layer itself shows no menu; the step of whichever of them is open above it
+// gets a down chevron that lists them as its siblings:
+//
+//	Plant › Hall 2 ⌄ › Press A
+//
+// Plant offers the halls, so Hall 2 carries the chevron. The offering stays
+// with the parent because the parent is what knows — and fetches — the
+// list, and a child pushed straight from the parent's view gets its chevron
+// without further ado.
 //
 // list is called just in time, each time the menu opens, and again on
 // [Layer.RefreshChildren]. It runs on the UI goroutine and should return at
@@ -115,9 +125,9 @@ func (l *Layer) SetTitle(title string) {
 // fetch started by the WithChildren list has finished. An open menu is
 // redrawn with the new entries, or closed when there are none.
 //
-// Without a WithChildren list, SetChildren alone decides the chevron: it
-// appears with the first entries and goes away with nil. With a list, the
-// next opening asks the list again.
+// Without a WithChildren list, SetChildren alone decides whether the step
+// above carries a chevron: it appears with the first entries and goes away
+// with nil. With a list, the next opening asks the list again.
 func (l *Layer) SetChildren(entries []Entry) {
 	l.entries = slices.Clone(entries)
 	chevron := l.list != nil || entries != nil

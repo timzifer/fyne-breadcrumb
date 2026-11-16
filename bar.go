@@ -10,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// separator is the text between two steps and on a chevron.
+// separator is the text between two steps.
 const separator = "›"
 
 // bar is the breadcrumb row. It runs in one line while it fits and wraps
@@ -26,13 +26,15 @@ type bar struct {
 	back, forward *widget.Button
 }
 
-// step is one layer in the bar: its crumb and the separator after it. A step
-// never wraps between crumb and separator.
+// step is one layer in the bar. It never wraps inside.
 type step struct {
 	crumb *widget.Button
-	// sep is a *widget.Button (a chevron with a menu), a *widget.Label
-	// (a plain separator) or nil (the last step without a menu).
-	sep fyne.CanvasObject
+	// siblings opens the menu of the layer's siblings — the entries its
+	// parent offers. nil when the parent offers none, and always for the
+	// root, which has no parent.
+	siblings *widget.Button
+	// sep is the separator to the next step, nil on the last one.
+	sep *widget.Label
 }
 
 func newBar(n *Nav) *bar {
@@ -67,18 +69,16 @@ func (b *bar) rebuild() {
 		if i == last {
 			s.crumb.Importance = widget.HighImportance
 		} else {
-			idx := i
 			s.crumb.Importance = widget.LowImportance
-			s.crumb.OnTapped = func() { n.PopTo(idx) }
+			s.crumb.OnTapped = func() { n.PopTo(i) }
 		}
-		switch {
-		case l.chevron:
-			idx := i
-			chevron := widget.NewButton(separator, nil)
-			chevron.Importance = widget.LowImportance
-			chevron.OnTapped = func() { n.showChildren(idx, chevron) }
-			s.sep = chevron
-		case i < last:
+		if i > 0 && n.stack[i-1].chevron {
+			parent := i - 1
+			s.siblings = widget.NewButtonWithIcon("", siblingsIcon, nil)
+			s.siblings.Importance = widget.LowImportance
+			s.siblings.OnTapped = func() { n.showChildren(parent, s.siblings) }
+		}
+		if i < last {
 			s.sep = widget.NewLabel(separator)
 		}
 		b.steps[i] = s
@@ -102,13 +102,9 @@ func (r *barRenderer) Objects() []fyne.CanvasObject { return r.objects }
 
 func (r *barRenderer) Refresh() {
 	r.objects = r.objects[:0]
-	if r.bar.lead != nil {
-		r.objects = append(r.objects, r.bar.lead)
-	}
-	for _, s := range r.bar.steps {
-		r.objects = append(r.objects, s.crumb)
-		if s.sep != nil {
-			r.objects = append(r.objects, s.sep)
+	for _, u := range r.bar.units() {
+		for _, p := range u {
+			r.objects = append(r.objects, p.obj)
 		}
 	}
 	r.Layout(r.bar.Size())
@@ -143,20 +139,41 @@ func (r *barRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(widest, b.arrange(width, false))
 }
 
-// unit is what arrange flows: the history buttons or one step.
-type unit struct {
-	a, b fyne.CanvasObject // b may be nil
+// unit is what arrange flows and never breaks: the history buttons, or one
+// step's crumb, sibling chevron and separator.
+type unit []piece
+
+// piece is one object of a unit. A glued piece sits right against the one
+// before it: the sibling chevron belongs to its title, not between steps.
+type piece struct {
+	obj  fyne.CanvasObject
+	glue bool
 }
 
 func (b *bar) units() []unit {
 	units := make([]unit, 0, len(b.steps)+1)
 	if b.lead != nil {
-		units = append(units, unit{a: b.lead})
+		units = append(units, unit{{obj: b.lead}})
 	}
 	for _, s := range b.steps {
-		units = append(units, unit{a: s.crumb, b: s.sep})
+		u := unit{{obj: s.crumb}}
+		if s.siblings != nil {
+			u = append(u, piece{obj: s.siblings, glue: true})
+		}
+		if s.sep != nil {
+			u = append(u, piece{obj: s.sep})
+		}
+		units = append(units, u)
 	}
 	return units
+}
+
+// gap is the space before piece i of a unit.
+func (u unit) gap(i int, pad float32) float32 {
+	if i == 0 || u[i].glue {
+		return 0
+	}
+	return pad
 }
 
 func (b *bar) widestUnit() float32 {
@@ -169,17 +186,17 @@ func (b *bar) widestUnit() float32 {
 }
 
 func (u unit) width(pad float32) float32 {
-	w := u.a.MinSize().Width
-	if u.b != nil {
-		w += pad + u.b.MinSize().Width
+	var w float32
+	for i, p := range u {
+		w += u.gap(i, pad) + p.obj.MinSize().Width
 	}
 	return w
 }
 
 func (u unit) height() float32 {
-	h := u.a.MinSize().Height
-	if u.b != nil {
-		h = max(h, u.b.MinSize().Height)
+	var h float32
+	for _, p := range u {
+		h = max(h, p.obj.MinSize().Height)
 	}
 	return h
 }
@@ -195,13 +212,13 @@ func (b *bar) arrange(width float32, place bool) float32 {
 			x, y, rowH = 0, y+rowH+pad, 0
 		}
 		if place {
-			as := u.a.MinSize()
-			u.a.Move(fyne.NewPos(x, y+(h-as.Height)/2))
-			u.a.Resize(as)
-			if u.b != nil {
-				bs := u.b.MinSize()
-				u.b.Move(fyne.NewPos(x+as.Width+pad, y+(h-bs.Height)/2))
-				u.b.Resize(bs)
+			ox := x
+			for i, p := range u {
+				ox += u.gap(i, pad)
+				s := p.obj.MinSize()
+				p.obj.Move(fyne.NewPos(ox, y+(h-s.Height)/2))
+				p.obj.Resize(s)
+				ox += s.Width
 			}
 		}
 		x += w + pad

@@ -39,7 +39,7 @@ type Nav struct {
 	historyButtons bool
 }
 
-// openMenu is the chevron menu currently on screen.
+// openMenu is the sibling menu currently on screen.
 type openMenu struct {
 	layer  *Layer
 	pop    *widget.PopUpMenu
@@ -192,8 +192,8 @@ func (n *Nav) update() {
 
 func (n *Nav) indexOf(l *Layer) int { return slices.Index(n.stack, l) }
 
-// childMenu builds the menu for the chevron of layer i from its current
-// entries, or nil when it has none.
+// childMenu builds the sibling menu from the entries layer i offers, or nil
+// when it has none.
 func (n *Nav) childMenu(i int) *fyne.Menu {
 	if i < 0 || i >= len(n.stack) || len(n.stack[i].entries) == 0 {
 		return nil
@@ -227,8 +227,9 @@ func (n *Nav) openEntry(l *Layer, e Entry) {
 	})
 }
 
-// showChildren opens the chevron menu of layer i below anchor, asking the
-// layer's list function for fresh entries first.
+// showChildren opens the entries of layer i below anchor — the sibling
+// chevron on the step above — asking the layer's list function for fresh
+// entries first.
 func (n *Nav) showChildren(i int, anchor fyne.CanvasObject) {
 	l := n.Layer(i)
 	if l == nil {

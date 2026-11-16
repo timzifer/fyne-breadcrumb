@@ -16,9 +16,9 @@ var (
 // BindShortcuts adds keyboard shortcuts to c: Alt+Left for [Nav.Back],
 // Alt+Right for [Nav.Forward] and Alt+Up for [Nav.Pop].
 //
-// Steps and chevrons in the bar are ordinary buttons, so Tab reaches them and
-// Space activates them without this; an open sibling menu takes the arrow
-// keys, Enter and Escape.
+// Steps and sibling chevrons in the bar are ordinary buttons, so Tab reaches
+// them and Space activates them without this; an open sibling menu takes the
+// arrow keys, Enter and Escape.
 //
 // Fyne hands a shortcut to the focused widget first, and a focused text entry
 // keeps it, so these shortcuts work while nothing or a button has the focus.
