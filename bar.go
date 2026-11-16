@@ -54,6 +54,7 @@ func (b *bar) rebuild() {
 	for i, l := range n.stack {
 		s := newSegment(shorten(l.title, n.maxTitleWidth))
 		s.icon, s.iconAt = l.icon, l.iconAt
+		s.color = l.color
 		s.first = i == 0
 		s.current = i == last
 		if !s.current {

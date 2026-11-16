@@ -28,6 +28,8 @@ type segment struct {
 	// icon stands before (IconLeading) or after the title; nil shows none.
 	icon   fyne.Resource
 	iconAt IconPlacement
+	// color fills the segment when set; the text takes black or white for contrast.
+	color color.Color
 
 	// onTap jumps to this step; nil on the current one.
 	onTap func()
@@ -258,9 +260,14 @@ func (r *segmentRenderer) Refresh() {
 		fill = over(fill, th.Color(theme.ColorNameHover, v))
 	}
 	r.fill = color.NRGBAModel.Convert(fill).(color.NRGBA)
+	textColor := th.Color(fg, v)
+	if s.color != nil {
+		r.fill = color.NRGBAModel.Convert(s.color).(color.NRGBA)
+		textColor = contrastOn(s.color)
+	}
 
 	r.text.Text = s.title
-	r.text.Color = th.Color(fg, v)
+	r.text.Color = textColor
 	r.text.TextSize = th.Size(theme.SizeNameText)
 	r.chevron.Resource = theme.NewColoredResource(siblingsIcon, fg)
 	if s.icon != nil {
@@ -313,4 +320,14 @@ func over(bottom, top color.Color) color.Color {
 	a := float64(t.A) / 255
 	mix := func(bc, tc uint8) uint8 { return uint8(float64(bc)*(1-a) + float64(tc)*a + 0.5) }
 	return color.NRGBA{R: mix(b.R, t.R), G: mix(b.G, t.G), B: mix(b.B, t.B), A: b.A}
+}
+
+// contrastOn is black or white, whichever reads better on c.
+func contrastOn(c color.Color) color.Color {
+	r, g, b, _ := c.RGBA()
+	lum := 0.299*float64(r)/65535 + 0.587*float64(g)/65535 + 0.114*float64(b)/65535
+	if lum > 0.6 {
+		return color.Black
+	}
+	return color.White
 }

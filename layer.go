@@ -1,6 +1,7 @@
 package breadcrumb
 
 import (
+	"image/color"
 	"slices"
 
 	"fyne.io/fyne/v2"
@@ -15,6 +16,8 @@ type Layer struct {
 	view  fyne.CanvasObject
 	key   string
 
+	// color fills the layer's segment instead of the theme colour; nil keeps the theme.
+	color color.Color
 	// icon is drawn in the layer's segment, placed by iconAt; nil shows none.
 	icon   fyne.Resource
 	iconAt IconPlacement
@@ -90,6 +93,12 @@ func WithIcon(res fyne.Resource, at IconPlacement) LayerOption {
 	return func(l *Layer) { l.icon, l.iconAt = res, at }
 }
 
+// WithColor fills the layer's segment with c instead of the theme colour; the text
+// switches to black or white for contrast. Use [Layer.SetColor] to change it later.
+func WithColor(c color.Color) LayerOption {
+	return func(l *Layer) { l.color = c }
+}
+
 // WithOnReturn calls fn whenever the layer becomes the top layer again after
 // it was covered — by a breadcrumb or menu tap, Pop, Back or Forward — but
 // not when it is first pushed. It is the place to reload a view that may
@@ -114,6 +123,16 @@ func (n *Nav) newLayer(title string, view fyne.CanvasObject, opts []LayerOption)
 
 // Title is the layer's step in the breadcrumb bar.
 func (l *Layer) Title() string { return l.title }
+
+// SetColor sets or, with c nil, resets the segment colour. It takes effect at once, also while
+// the layer is on the stack.
+func (l *Layer) SetColor(c color.Color) {
+	l.color = c
+	if !l.onStack() {
+		return
+	}
+	l.nav.bar.rebuild()
+}
 
 // SetIcon sets or, with res nil, removes the icon of the layer's step. It
 // takes effect at once, also while the layer is on the stack.

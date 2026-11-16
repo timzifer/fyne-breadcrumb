@@ -26,6 +26,7 @@ type Nav struct {
 	OnChanged func()
 
 	bar     *bar
+	top     *fyne.Container // breadcrumb row: the bar, with the trailing element at its right
 	host    *fyne.Container
 	content fyne.CanvasObject
 	stack   []*Layer
@@ -54,12 +55,24 @@ type openMenu struct {
 func New(rootTitle string, root fyne.CanvasObject, opts ...LayerOption) *Nav {
 	n := &Nav{host: container.NewStack(), maxTitleWidth: DefaultMaxTitleWidth, segmentGap: -1}
 	n.bar = newBar(n)
-	n.content = container.NewBorder(n.bar, nil, nil, nil, n.host)
+	n.top = container.NewBorder(nil, nil, nil, nil, n.bar)
+	n.content = container.NewBorder(n.top, nil, nil, nil, n.host)
 	n.ExtendBaseWidget(n)
 	n.stack = []*Layer{n.newLayer(rootTitle, root, opts)}
 	n.history = newHistory(n.stack)
 	n.commit(false)
 	return n
+}
+
+// SetTrailing puts obj at the right end of the breadcrumb row, on the same line as the steps,
+// for example a status light. nil removes it. The steps keep the remaining width.
+func (n *Nav) SetTrailing(obj fyne.CanvasObject) {
+	n.top = container.NewBorder(nil, nil, nil, obj, n.bar)
+	if c, ok := n.content.(*fyne.Container); ok && len(c.Objects) > 0 {
+		c.Objects[0] = n.top
+		c.Refresh()
+	}
+	n.Refresh()
 }
 
 // CreateRenderer is part of [fyne.Widget].
