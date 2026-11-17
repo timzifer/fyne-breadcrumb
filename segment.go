@@ -272,7 +272,7 @@ func (r *segmentRenderer) Refresh() {
 	r.text.Text = s.title
 	r.text.Color = textColor
 	r.text.TextSize = th.Size(theme.SizeNameText)
-	r.chevron.Resource = theme.NewColoredResource(siblingsIcon, fg)
+	r.chevron.Resource = siblingsIconIn(textColor)
 	if s.icon != nil {
 		if r.icon == nil {
 			r.icon = canvas.NewImageFromResource(s.icon)
