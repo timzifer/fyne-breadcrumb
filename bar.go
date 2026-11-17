@@ -53,7 +53,7 @@ func (b *bar) rebuild() {
 	b.steps = make([]*segment, len(n.stack))
 	for i, l := range n.stack {
 		s := newSegment(shorten(l.title, n.maxTitleWidth))
-		s.icon, s.iconAt = l.icon, l.iconAt
+		s.icon, s.iconAt, s.iconObj = l.icon, l.iconAt, l.iconObj
 		s.color = l.color
 		s.neutral = l.neutral
 		s.iconTint = l.iconTint

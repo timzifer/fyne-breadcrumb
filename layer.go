@@ -22,6 +22,8 @@ type Layer struct {
 	neutral bool
 	// iconTint is the theme colour of the icon; empty keeps the step's foreground.
 	iconTint fyne.ThemeColorName
+	// iconObj is a canvas object drawn instead of icon: it takes the row's height.
+	iconObj fyne.CanvasObject
 	// icon is drawn in the layer's segment, placed by iconAt; nil shows none.
 	icon   fyne.Resource
 	iconAt IconPlacement
@@ -94,7 +96,13 @@ func WithChildren(list func() []Entry) LayerOption {
 // WithIcon shows res in the layer's segment, at the given side of the title.
 // Use [Layer.SetIcon] to change or remove it later.
 func WithIcon(res fyne.Resource, at IconPlacement) LayerOption {
-	return func(l *Layer) { l.icon, l.iconAt = res, at }
+	return func(l *Layer) { l.icon, l.iconAt, l.iconObj = res, at, nil }
+}
+
+// WithIconObject is like [WithIcon], but the step shows obj. The object takes the height of the
+// row, and its width follows its own proportion (MinSize). Use [Layer.SetIconObject] to change it later.
+func WithIconObject(obj fyne.CanvasObject, at IconPlacement) LayerOption {
+	return func(l *Layer) { l.icon, l.iconAt, l.iconObj = nil, at, obj }
 }
 
 // WithColor fills the layer's segment with c instead of the theme colour; the text
@@ -161,7 +169,17 @@ func (l *Layer) SetIconTint(name fyne.ThemeColorName) {
 // SetIcon sets or, with res nil, removes the icon of the layer's step. It
 // takes effect at once, also while the layer is on the stack.
 func (l *Layer) SetIcon(res fyne.Resource, at IconPlacement) {
-	l.icon, l.iconAt = res, at
+	l.icon, l.iconAt, l.iconObj = res, at, nil
+	if !l.onStack() {
+		return
+	}
+	l.nav.bar.rebuild()
+}
+
+// SetIconObject sets or, with obj nil, removes the step's icon object (see [WithIconObject]). It
+// takes effect at once, also while the layer is on the stack.
+func (l *Layer) SetIconObject(obj fyne.CanvasObject, at IconPlacement) {
+	l.icon, l.iconAt, l.iconObj = nil, at, obj
 	if !l.onStack() {
 		return
 	}

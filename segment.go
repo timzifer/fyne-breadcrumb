@@ -28,6 +28,8 @@ type segment struct {
 	// icon stands before (IconLeading) or after the title; nil shows none.
 	icon   fyne.Resource
 	iconAt IconPlacement
+	// iconObj is drawn instead of icon when set; its width follows the row height.
+	iconObj fyne.CanvasObject
 	// color fills the segment when set; the text takes black or white for contrast.
 	color color.Color
 	// neutral keeps the top step in the button colour; iconTint is the icon's theme colour.
@@ -76,29 +78,45 @@ func (s *segment) titleSize() fyne.Size {
 // chevronX is where the sibling chevron starts, in segment coordinates.
 func (s *segment) chevronX() float32 {
 	left, _ := s.insets(s.Size().Height)
-	return left + s.iconLead() + s.titleSize().Width + s.iconTrail() + theme.Padding()
+	h := s.Size().Height
+	return left + s.iconLead(h) + s.titleSize().Width + s.iconTrail(h) + theme.Padding()
 }
 
-// iconWidth is the room the icon and the gap to the title take, 0 without an icon.
-func (s *segment) iconWidth() float32 {
-	if s.icon == nil {
-		return 0
+// hasIcon reports whether the segment shows an icon or an icon object.
+func (s *segment) hasIcon() bool { return s.icon != nil || s.iconObj != nil }
+
+// iconObjWidth is the width of the icon object at row height h, from its own proportion.
+func (s *segment) iconObjWidth(h float32) float32 {
+	ratio := float32(1)
+	if ms := s.iconObj.MinSize(); ms.Width > 0 && ms.Height > 0 {
+		ratio = ms.Width / ms.Height
 	}
-	return iconSize() + theme.Padding()
+	return h * ratio
 }
 
-// iconLead is the room in front of the title taken by a leading icon.
-func (s *segment) iconLead() float32 {
-	if s.icon != nil && s.iconAt == IconLeading {
-		return s.iconWidth()
+// iconWidth is the room the icon and the gap to the title take at row height h, 0 without an icon.
+func (s *segment) iconWidth(h float32) float32 {
+	switch {
+	case s.iconObj != nil:
+		return s.iconObjWidth(h) + theme.Padding()
+	case s.icon != nil:
+		return iconSize() + theme.Padding()
 	}
 	return 0
 }
 
-// iconTrail is the room behind the title taken by a trailing icon.
-func (s *segment) iconTrail() float32 {
-	if s.icon != nil && s.iconAt == IconTrailing {
-		return s.iconWidth()
+// iconLead is the room in front of the title taken by a leading icon at row height h.
+func (s *segment) iconLead(h float32) float32 {
+	if s.hasIcon() && s.iconAt == IconLeading {
+		return s.iconWidth(h)
+	}
+	return 0
+}
+
+// iconTrail is the room behind the title taken by a trailing icon at row height h.
+func (s *segment) iconTrail(h float32) float32 {
+	if s.hasIcon() && s.iconAt == IconTrailing {
+		return s.iconWidth(h)
 	}
 	return 0
 }
@@ -204,7 +222,9 @@ func (r *segmentRenderer) Destroy() {}
 
 func (r *segmentRenderer) Objects() []fyne.CanvasObject {
 	out := []fyne.CanvasObject{r.shape, r.text}
-	if r.seg.icon != nil && r.icon != nil {
+	if r.seg.iconObj != nil {
+		out = append(out, r.seg.iconObj)
+	} else if r.seg.icon != nil && r.icon != nil {
 		out = append(out, r.icon)
 	}
 	if r.seg.onSiblings != nil {
@@ -219,7 +239,7 @@ func (r *segmentRenderer) MinSize() fyne.Size {
 	ts := r.seg.titleSize()
 	h := ts.Height + 2*theme.InnerPadding()
 	left, right := r.seg.insets(h)
-	w := left + r.seg.iconWidth() + ts.Width + right
+	w := left + r.seg.iconWidth(h) + ts.Width + right
 	if r.seg.onSiblings != nil {
 		w += theme.Padding() + chevronSize()
 	}
@@ -231,13 +251,20 @@ func (r *segmentRenderer) Layout(size fyne.Size) {
 	r.shape.Move(fyne.NewPos(0, 0))
 	left, _ := r.seg.insets(size.Height)
 	ts := r.text.MinSize()
-	r.text.Move(fyne.NewPos(left+r.seg.iconLead(), (size.Height-ts.Height)/2))
+	r.text.Move(fyne.NewPos(left+r.seg.iconLead(size.Height), (size.Height-ts.Height)/2))
 	r.text.Resize(ts)
-	if r.icon != nil {
+	if r.seg.iconObj != nil {
+		x := left
+		if r.seg.iconAt == IconTrailing {
+			x = left + r.seg.iconLead(size.Height) + ts.Width + theme.Padding()
+		}
+		r.seg.iconObj.Resize(fyne.NewSize(r.seg.iconObjWidth(size.Height), size.Height))
+		r.seg.iconObj.Move(fyne.NewPos(x, 0))
+	} else if r.icon != nil {
 		is := iconSize()
 		x := left
 		if r.seg.iconAt == IconTrailing {
-			x = left + r.seg.iconLead() + ts.Width + theme.Padding()
+			x = left + r.seg.iconLead(size.Height) + ts.Width + theme.Padding()
 		}
 		r.icon.Resize(fyne.NewSquareSize(is))
 		r.icon.Move(fyne.NewPos(x, (size.Height-is)/2))

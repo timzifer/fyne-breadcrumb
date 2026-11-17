@@ -3,6 +3,8 @@ package breadcrumb
 import (
 	"testing"
 
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/theme"
 )
 
@@ -10,22 +12,37 @@ import (
 func TestSegmentIconWidensStep(t *testing.T) {
 	plain := newSegment("Auftrag 65268")
 	w0 := plain.MinSize().Width
+	h := plain.MinSize().Height
 
 	lead := newSegment("Auftrag 65268")
 	lead.icon, lead.iconAt = theme.InfoIcon(), IconLeading
-	if got := lead.MinSize().Width - w0; got-lead.iconWidth() > 0.01 || lead.iconWidth()-got > 0.01 {
-		t.Fatalf("Icon vorne: Breite +%v, erwartet +%v", got, lead.iconWidth())
+	if got := lead.MinSize().Width - w0; got-lead.iconWidth(h) > 0.01 || lead.iconWidth(h)-got > 0.01 {
+		t.Fatalf("Icon vorne: Breite +%v, erwartet +%v", got, lead.iconWidth(h))
 	}
-	if lead.iconLead() == 0 || lead.iconTrail() != 0 {
-		t.Fatalf("vorne: lead=%v trail=%v", lead.iconLead(), lead.iconTrail())
+	if lead.iconLead(h) == 0 || lead.iconTrail(h) != 0 {
+		t.Fatalf("vorne: lead=%v trail=%v", lead.iconLead(h), lead.iconTrail(h))
 	}
 
 	trail := newSegment("Auftrag 65268")
 	trail.icon, trail.iconAt = theme.InfoIcon(), IconTrailing
-	if trail.iconTrail() == 0 || trail.iconLead() != 0 {
-		t.Fatalf("hinten: lead=%v trail=%v", trail.iconLead(), trail.iconTrail())
+	if trail.iconTrail(h) == 0 || trail.iconLead(h) != 0 {
+		t.Fatalf("hinten: lead=%v trail=%v", trail.iconLead(h), trail.iconTrail(h))
 	}
 	if trail.MinSize().Width != lead.MinSize().Width {
 		t.Fatalf("vorne und hinten gleich breit: %v vs %v", trail.MinSize().Width, lead.MinSize().Width)
+	}
+}
+
+// Ein Icon-Objekt nimmt die Zeilenhöhe, seine Breite folgt dem Seitenverhältnis seiner Mindestgröße.
+func TestSegmentIconObjectFollowsRowHeight(t *testing.T) {
+	seg := newSegment("Bereich")
+	box := canvas.NewRectangle(nil)
+	box.SetMinSize(fyne.NewSize(34, 12))
+	seg.iconObj, seg.iconAt = box, IconTrailing
+	if got, want := seg.iconObjWidth(24), float32(24*34/12); got-want > 0.01 || want-got > 0.01 {
+		t.Fatalf("Breite bei Höhe 24: %v, erwartet %v", got, want)
+	}
+	if seg.iconTrail(24) == 0 {
+		t.Fatal("Icon-Objekt belegt keinen Platz")
 	}
 }
