@@ -18,6 +18,10 @@ type Layer struct {
 
 	// color fills the layer's segment instead of the theme colour; nil keeps the theme.
 	color color.Color
+	// neutral draws the layer like any other step, also while it is the top one.
+	neutral bool
+	// iconTint is the theme colour of the icon; empty keeps the step's foreground.
+	iconTint fyne.ThemeColorName
 	// icon is drawn in the layer's segment, placed by iconAt; nil shows none.
 	icon   fyne.Resource
 	iconAt IconPlacement
@@ -128,6 +132,26 @@ func (l *Layer) Title() string { return l.title }
 // the layer is on the stack.
 func (l *Layer) SetColor(c color.Color) {
 	l.color = c
+	if !l.onStack() {
+		return
+	}
+	l.nav.bar.rebuild()
+}
+
+// SetNeutral draws the layer in the button colour with the foreground text, also while it is
+// the top layer (instead of the primary colour). It takes effect at once.
+func (l *Layer) SetNeutral(neutral bool) {
+	l.neutral = neutral
+	if !l.onStack() {
+		return
+	}
+	l.nav.bar.rebuild()
+}
+
+// SetIconTint sets the theme colour the icon is drawn in; an empty name keeps the foreground.
+// It takes effect at once.
+func (l *Layer) SetIconTint(name fyne.ThemeColorName) {
+	l.iconTint = name
 	if !l.onStack() {
 		return
 	}

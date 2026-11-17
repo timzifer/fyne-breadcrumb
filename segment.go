@@ -30,6 +30,9 @@ type segment struct {
 	iconAt IconPlacement
 	// color fills the segment when set; the text takes black or white for contrast.
 	color color.Color
+	// neutral keeps the top step in the button colour; iconTint is the icon's theme colour.
+	neutral  bool
+	iconTint fyne.ThemeColorName
 
 	// onTap jumps to this step; nil on the current one.
 	onTap func()
@@ -249,7 +252,7 @@ func (r *segmentRenderer) Refresh() {
 	th := s.Theme()
 	v := fyne.CurrentApp().Settings().ThemeVariant()
 	bg, fg := theme.ColorNameButton, theme.ColorNameForeground
-	if s.current {
+	if s.current && !s.neutral {
 		bg, fg = theme.ColorNamePrimary, theme.ColorNameForegroundOnPrimary
 	}
 	fill := th.Color(bg, v)
@@ -275,7 +278,11 @@ func (r *segmentRenderer) Refresh() {
 			r.icon = canvas.NewImageFromResource(s.icon)
 			r.icon.FillMode = canvas.ImageFillContain
 		}
-		r.icon.Resource = theme.NewColoredResource(s.icon, fg)
+		tint := fg
+		if s.iconTint != "" {
+			tint = s.iconTint
+		}
+		r.icon.Resource = theme.NewColoredResource(s.icon, tint)
 		r.icon.Refresh()
 	}
 

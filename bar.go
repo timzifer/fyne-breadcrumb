@@ -55,6 +55,8 @@ func (b *bar) rebuild() {
 		s := newSegment(shorten(l.title, n.maxTitleWidth))
 		s.icon, s.iconAt = l.icon, l.iconAt
 		s.color = l.color
+		s.neutral = l.neutral
+		s.iconTint = l.iconTint
 		s.first = i == 0
 		s.current = i == last
 		if !s.current {
