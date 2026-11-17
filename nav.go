@@ -83,6 +83,14 @@ func (n *Nav) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(n.content)
 }
 
+// Header is the breadcrumb bar with its trailing element, for a layout that puts it
+// somewhere other than on top of the view (a north row over several views). It is the
+// same object the widget shows; use either Nav itself or Header and Body, not both.
+func (n *Nav) Header() fyne.CanvasObject { return n.top }
+
+// Body is the view of the topmost layer, without the bar; see Header.
+func (n *Nav) Body() fyne.CanvasObject { return n.host }
+
 // Push puts a new layer on top and shows it. The returned handle changes the
 // layer's title or menu entries later.
 func (n *Nav) Push(title string, view fyne.CanvasObject, opts ...LayerOption) *Layer {
