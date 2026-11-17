@@ -33,14 +33,14 @@ func TestSegmentIconWidensStep(t *testing.T) {
 	}
 }
 
-// Ein Icon-Objekt nimmt die Zeilenhöhe, seine Breite folgt dem Seitenverhältnis seiner Mindestgröße.
-func TestSegmentIconObjectFollowsRowHeight(t *testing.T) {
+// Ein Icon-Objekt hat die Größe, die es selbst meldet, und steht mittig in der Zeile.
+func TestSegmentIconObjectKeepsItsOwnSize(t *testing.T) {
 	seg := newSegment("Bereich")
 	box := canvas.NewRectangle(nil)
 	box.SetMinSize(fyne.NewSize(34, 12))
 	seg.iconObj, seg.iconAt = box, IconTrailing
-	if got, want := seg.iconObjWidth(24), float32(24*34/12); got-want > 0.01 || want-got > 0.01 {
-		t.Fatalf("Breite bei Höhe 24: %v, erwartet %v", got, want)
+	if got := seg.iconObjSize(); got != fyne.NewSize(34, 12) {
+		t.Fatalf("Größe %v, erwartet 34x12", got)
 	}
 	if seg.iconTrail(24) == 0 {
 		t.Fatal("Icon-Objekt belegt keinen Platz")

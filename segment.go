@@ -85,20 +85,15 @@ func (s *segment) chevronX() float32 {
 // hasIcon reports whether the segment shows an icon or an icon object.
 func (s *segment) hasIcon() bool { return s.icon != nil || s.iconObj != nil }
 
-// iconObjWidth is the width of the icon object at row height h, from its own proportion.
-func (s *segment) iconObjWidth(h float32) float32 {
-	ratio := float32(1)
-	if ms := s.iconObj.MinSize(); ms.Width > 0 && ms.Height > 0 {
-		ratio = ms.Width / ms.Height
-	}
-	return h * ratio
-}
+// iconObjSize is the size of the icon object: its own minimum size. The object decides how big
+// it is; the step only places it, centred in the row.
+func (s *segment) iconObjSize() fyne.Size { return s.iconObj.MinSize() }
 
 // iconWidth is the room the icon and the gap to the title take at row height h, 0 without an icon.
 func (s *segment) iconWidth(h float32) float32 {
 	switch {
 	case s.iconObj != nil:
-		return s.iconObjWidth(h) + theme.Padding()
+		return s.iconObjSize().Width + theme.Padding()
 	case s.icon != nil:
 		return iconSize() + theme.Padding()
 	}
@@ -258,8 +253,9 @@ func (r *segmentRenderer) Layout(size fyne.Size) {
 		if r.seg.iconAt == IconTrailing {
 			x = left + r.seg.iconLead(size.Height) + ts.Width + theme.Padding()
 		}
-		r.seg.iconObj.Resize(fyne.NewSize(r.seg.iconObjWidth(size.Height), size.Height))
-		r.seg.iconObj.Move(fyne.NewPos(x, 0))
+		is := r.seg.iconObjSize()
+		r.seg.iconObj.Resize(is)
+		r.seg.iconObj.Move(fyne.NewPos(x, (size.Height-is.Height)/2))
 	} else if r.icon != nil {
 		is := iconSize()
 		x := left
